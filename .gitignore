@@ -1,0 +1,13 @@
+.env
+
+# client
+node_modules/
+dist/
+*.tsbuildinfo
+
+# server
+__pycache__/
+.pytest_cache/
+.venv/
+
+.DS_Store

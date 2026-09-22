@@ -1,0 +1,63 @@
+name: status-checker
+
+services:
+  # Runs on every machine you want to monitor.
+  server:
+    build: ./server
+    restart: unless-stopped
+    environment:
+      API_KEY: ${API_KEY:-}
+      HOST_NAME: ${HOST_NAME:-}
+      # CPU and memory always describe the host. Disk usage describes the disk
+      # that holds Docker's data, which on most hosts is the root disk. To
+      # report another filesystem, mount any directory that lives on it
+      # (read-only) and point DISK_PATH at the mount:
+      #   volumes: ["/data:/mnt/data:ro"]  +  DISK_PATH: /mnt/data
+      DISK_PATH: /
+    ports:
+      - "${SERVER_PORT:-8000}:8000"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import os, urllib.request
+          request = urllib.request.Request(
+              "http://127.0.0.1:8000/api/v1/status",
+              headers={"X-API-Key": os.environ["API_KEY"]},
+          )
+          urllib.request.urlopen(request, timeout=3)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+      start_interval: 1s
+
+  # The dashboard. Runs wherever you want to look at it from.
+  client:
+    build: ./client
+    restart: unless-stopped
+    environment:
+      # Defaults to the server above, for when both run on the same machine.
+      SERVERS: ${SERVERS:-Local|http://server:8000|${API_KEY:-}}
+      REFRESH_SECONDS: ${REFRESH_SECONDS:-5}
+    ports:
+      - "${CLIENT_PORT:-3000}:3000"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:3000/api/servers"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+      start_interval: 1s
